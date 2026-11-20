@@ -2,7 +2,10 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
-from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
+from fastapi.exception_handlers import (
+    http_exception_handler,
+    request_validation_exception_handler,
+)
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -14,6 +17,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 import models
 from database import Base, engine, get_db
 from routers import posts, users
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -40,7 +44,8 @@ app.include_router(posts.router, prefix="/api/posts", tags=["posts"])
 @app.get("/posts", include_in_schema=False, name="posts")
 async def home(request: Request, db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(
-        select(models.Post).options(selectinload(models.Post.author))
+        select(models.Post)
+        .options(selectinload(models.Post.author))
         .order_by(models.Post.date_posted.desc()),
     )
     posts = result.scalars().all()
@@ -52,11 +57,15 @@ async def home(request: Request, db: Annotated[AsyncSession, Depends(get_db)]):
 
 
 @app.get("/posts/{post_id}", include_in_schema=False)
-async def post_page(request: Request, post_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
+async def post_page(
+    request: Request,
+    post_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
     result = await db.execute(
         select(models.Post)
         .options(selectinload(models.Post.author))
-        .where(models.Post.id == post_id)
+        .where(models.Post.id == post_id),
     )
     post = result.scalars().first()
     if post:
@@ -119,21 +128,24 @@ async def account_page(request: Request):
     return templates.TemplateResponse(
         request,
         "account.html",
-        {"title": "Acount"},
+        {"title": "Account"},
     )
 
+
 @app.exception_handler(StarletteHTTPException)
-async def general_http_exception_handler(request: Request, exception: StarletteHTTPException):
-    
+async def general_http_exception_handler(
+    request: Request,
+    exception: StarletteHTTPException,
+):
     if request.url.path.startswith("/api"):
         return await http_exception_handler(request, exception)
 
     message = (
-            exception.detail
-            if exception.detail
-            else "An error occurred. Please check your request and try again."
+        exception.detail
+        if exception.detail
+        else "An error occurred. Please check your request and try again."
     )
-    
+
     return templates.TemplateResponse(
         request,
         "error.html",
@@ -147,10 +159,13 @@ async def general_http_exception_handler(request: Request, exception: StarletteH
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exception: RequestValidationError):
+async def validation_exception_handler(
+    request: Request,
+    exception: RequestValidationError,
+):
     if request.url.path.startswith("/api"):
         return await request_validation_exception_handler(request, exception)
-    
+
     return templates.TemplateResponse(
         request,
         "error.html",

@@ -6,10 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 import models
+from auth import CurrentUser
 from database import get_db
 from schemas import PostCreate, PostResponse, PostUpdate
-
-from auth import CurrentUser
 
 router = APIRouter()
 
@@ -17,8 +16,9 @@ router = APIRouter()
 @router.get("", response_model=list[PostResponse])
 async def get_posts(db: Annotated[AsyncSession, Depends(get_db)]):
     result = await db.execute(
-        select(models.Post).options(selectinload(models.Post.author))
-        .order_by(models.Post.date_posted.desc()),  
+        select(models.Post)
+        .options(selectinload(models.Post.author))
+        .order_by(models.Post.date_posted.desc()),
     )
     posts = result.scalars().all()
     return posts
@@ -29,8 +29,11 @@ async def get_posts(db: Annotated[AsyncSession, Depends(get_db)]):
     response_model=PostResponse,
     status_code=status.HTTP_201_CREATED,
 )
-async def create_post(post: PostCreate, current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
-    
+async def create_post(
+    post: PostCreate,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
     new_post = models.Post(
         title=post.title,
         content=post.content,
@@ -73,7 +76,7 @@ async def update_post_full(
     if post.user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to updade this post",
+            detail="Not authorized to update this post",
         )
 
     post.title = post_data.title
@@ -102,7 +105,7 @@ async def update_post_partial(
     if post.user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to updade this post",
+            detail="Not authorized to update this post",
         )
 
     update_data = post_data.model_dump(exclude_unset=True)
@@ -115,7 +118,11 @@ async def update_post_partial(
 
 
 @router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_post(post_id: int, current_user: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]):
+async def delete_post(
+    post_id: int,
+    current_user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
     result = await db.execute(select(models.Post).where(models.Post.id == post_id))
     post = result.scalars().first()
     if not post:
@@ -127,7 +134,7 @@ async def delete_post(post_id: int, current_user: CurrentUser, db: Annotated[Asy
     if post.user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to updade this post",
+            detail="Not authorized to delete this post",
         )
 
     await db.delete(post)
